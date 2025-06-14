@@ -16,6 +16,15 @@ app.add_middleware(
 class MemeRequest(BaseModel):
     prompt: str
 
+@app.get("/")
+async def root():
+    return JSONResponse(
+        status_code = 200,
+        content = {
+            "message": "The Meme Machine is up and running!"
+        }
+    )
+
 @app.post("/generate_meme")
 async def generate_meme(request: MemeRequest):
     text_prompt = request.prompt
