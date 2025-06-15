@@ -74,12 +74,12 @@ async def generate_meme(request: MemeRequest):
         )
         # print(f"State after event: {updated_session.state}")
 
-        # agent = TemplateScoutAgent()
-        # result = await agent.run(query="test", session=session, tools=None)
+        agent = TemplateScoutAgent()
+        result = await agent.run(query="test", session=session, tools=None)
         return JSONResponse(
             status_code = 200,
             content = {
-                "result": session.state
+                "result": result
             }
         )
     except Exception as e:

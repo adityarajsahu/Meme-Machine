@@ -192,3 +192,9 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Python file for creating embeddings
+create_embeddings.py
+
+# Data file
+data/meme_data.json
