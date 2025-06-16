@@ -4,10 +4,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from google.adk.sessions import InMemorySessionService
 from google.adk.events import Event, EventActions
+from google.adk.runners import Runner
+from google.genai import types
 import uvicorn
 import time
 
 from agents.template_scout import TemplateScoutAgent
+from agents.caption_generator import CaptionGenerationAgent
 
 app = FastAPI()
 app.add_middleware(
@@ -75,11 +78,27 @@ async def generate_meme(request: MemeRequest):
         # print(f"State after event: {updated_session.state}")
 
         agent = TemplateScoutAgent()
-        result = await agent.run(query="test", session=session, tools=None)
+        image_url = await agent.run(query="test", session=session, tools=None)
+
+        runner = Runner(
+            agent = CaptionGenerationAgent, 
+            app_name = "meme_machine", 
+            session_service = session_service
+        )
+
+        content = types.Content(role = "user", parts = [types.Part(text = updated_session.state["prompt"])])
+        events = runner.run(user_id = user_id, session_id = session.id, new_message = content)
+
+        updated_session = await session_service.get_session(
+            app_name = "meme_machine",
+            user_id = user_id,
+            session_id = session.id
+        )
+
         return JSONResponse(
             status_code = 200,
             content = {
-                "result": result
+                "result": updated_session.state
             }
         )
     except Exception as e:
