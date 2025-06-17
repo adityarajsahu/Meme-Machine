@@ -11,6 +11,7 @@ import time
 
 from agents.template_scout import TemplateScoutAgent
 from agents.caption_generator import CaptionGenerationAgent
+from agents.prompt_moderator import PromptModerationAgent
 
 app = FastAPI()
 app.add_middleware(
@@ -70,24 +71,43 @@ async def generate_meme(request: MemeRequest):
             session,
             system_event
         )
-        updated_session = await session_service.get_session(
-            app_name = "meme_machine",
-            user_id = user_id,
-            session_id = session.id
-        )
-        # print(f"State after event: {updated_session.state}")
 
         agent = TemplateScoutAgent()
         image_url = await agent.run(query="test", session=session, tools=None)
 
-        runner = Runner(
+        runner_caption_generator = Runner(
             agent = CaptionGenerationAgent, 
             app_name = "meme_machine", 
             session_service = session_service
         )
 
-        content = types.Content(role = "user", parts = [types.Part(text = updated_session.state["prompt"])])
-        events = runner.run(user_id = user_id, session_id = session.id, new_message = content)
+        content_caption_generator = types.Content(role = "user", parts = [types.Part(text = session.state["prompt"])])
+        events_caption_generator = runner_caption_generator.run(user_id = user_id, session_id = session.id, new_message = content_caption_generator)
+
+        caption_response = "No final response captured."
+        for event in events_caption_generator:
+            if event.is_final_response() and event.content and event.content.parts:
+                # print(f"Potential final response from [{event.author}]: {event.content.parts[0].text}")
+                caption_response = event.content.parts[0].text
+
+        print("Agent Final Response: ", caption_response)
+
+        runner_prompt_moderator = Runner(
+            agent = PromptModerationAgent, 
+            app_name = "meme_machine", 
+            session_service = session_service
+        )
+
+        content_prompt_moderator = types.Content(role = "user", parts = [types.Part(text = session.state["prompt"])])
+        events_prompt_moderator = runner_prompt_moderator.run(user_id = user_id, session_id = session.id, new_message = content_prompt_moderator)
+
+        moderator_response = ""
+        for event in events_prompt_moderator:
+            if event.is_final_response() and event.content and event.content.parts:
+                # print(f"Potential final response from [{event.author}]: {event.content.parts[0].text}")
+                moderator_response = event.content.parts[0].text
+
+        print("Moderator Final Response: ", moderator_response)
 
         updated_session = await session_service.get_session(
             app_name = "meme_machine",
@@ -98,7 +118,10 @@ async def generate_meme(request: MemeRequest):
         return JSONResponse(
             status_code = 200,
             content = {
-                "result": updated_session.state
+                "prompt": updated_session.state["prompt"],
+                "image_url": image_url,
+                "caption": updated_session.state["caption"],
+                "moderator_response": updated_session.state["moderator_response"]
             }
         )
     except Exception as e:
