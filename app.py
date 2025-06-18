@@ -8,10 +8,12 @@ from google.adk.runners import Runner
 from google.genai import types
 import uvicorn
 import time
+import os
 
 from agents.template_scout import TemplateScoutAgent
 from agents.caption_generator import CaptionGenerationAgent
 from agents.prompt_moderator import PromptModerationAgent
+from agents.meme_composer import MemeComposerAgent
 
 app = FastAPI()
 app.add_middleware(
@@ -72,9 +74,27 @@ async def generate_meme(request: MemeRequest):
             system_event
         )
 
-        agent = TemplateScoutAgent()
-        image_url = await agent.run(query="test", session=session, tools=None)
+        ### TEMPLATE SCOUT AGENT ###
+        # agent = TemplateScoutAgent()
+        # image_url = await agent.run(query="test", session=session, tools=None)
+        runner_template_scout = Runner(
+            agent = TemplateScoutAgent, 
+            app_name = "meme_machine", 
+            session_service = session_service
+        )
 
+        content_template_scout = types.Content(role = "user", parts = [types.Part(text = session.state["prompt"])])
+        events_template_scout = runner_template_scout.run(user_id = user_id, session_id = session.id, new_message = content_template_scout) 
+
+        template_response = "No final response captured."
+        for event in events_template_scout:
+            if event.is_final_response() and event.content and event.content.parts:
+                # print(f"Potential final response from [{event.author}]: {event.content.parts[0].text}")
+                template_response = event.content.parts[0].text
+
+        print("Template Scout Final Response: ", template_response)
+
+        ### CAPTION GENERATOR AGENT ###
         runner_caption_generator = Runner(
             agent = CaptionGenerationAgent, 
             app_name = "meme_machine", 
@@ -90,8 +110,9 @@ async def generate_meme(request: MemeRequest):
                 # print(f"Potential final response from [{event.author}]: {event.content.parts[0].text}")
                 caption_response = event.content.parts[0].text
 
-        print("Agent Final Response: ", caption_response)
+        print("Caption Generator Final Response: ", caption_response)
 
+        ### PROMPT MODERATOR AGENT ###
         runner_prompt_moderator = Runner(
             agent = PromptModerationAgent, 
             app_name = "meme_machine", 
@@ -109,19 +130,41 @@ async def generate_meme(request: MemeRequest):
 
         print("Moderator Final Response: ", moderator_response)
 
+        ### MEME COMPOSER ###
+        runner_meme_composer = Runner(
+            agent = MemeComposerAgent,
+            app_name = "meme_machine", 
+            session_service = session_service
+        )
+
+        content_meme_composer = types.Content(role = "user", parts = [types.Part(text = session.state["prompt"])])
+        events_meme_composer = runner_meme_composer.run(user_id = user_id, session_id = session.id, new_message = content_meme_composer)
+
+        for event in events_meme_composer:
+            if event.is_final_response() and event.content and event.content.parts:
+                print(event.content.parts)
+
         updated_session = await session_service.get_session(
             app_name = "meme_machine",
             user_id = user_id,
             session_id = session.id
         )
 
+        try:
+            os.remove(updated_session.state["meme_file_path"].strip())
+            print("Meme Image has been deleted successfully.")
+        except Exception as e:
+            print("An error occurred: {}".format(e))
+
         return JSONResponse(
             status_code = 200,
             content = {
                 "prompt": updated_session.state["prompt"],
-                "image_url": image_url,
+                "image_url": updated_session.state["image_url"],
                 "caption": updated_session.state["caption"],
-                "moderator_response": updated_session.state["moderator_response"]
+                "moderator_response": updated_session.state["moderator_response"],
+                "meme_file_path": updated_session.state["meme_file_path"],
+                "session_data": updated_session.state
             }
         )
     except Exception as e:
