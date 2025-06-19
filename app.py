@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -43,8 +43,15 @@ async def root():
         }
     )
 
+def delete_meme_image(meme_image_path: str):
+    try:
+        os.remove(meme_image_path)
+        print("Meme Image has been deleted successfully.")
+    except Exception as e:
+        print("An error occurred: {}".format(e))
+
 @app.post("/generate_meme")
-async def generate_meme(request: MemeRequest):
+async def generate_meme(request: MemeRequest, background_tasks: BackgroundTasks):
     user_id = request.user_id
     text_prompt = request.prompt
     if not text_prompt:
@@ -148,23 +155,24 @@ async def generate_meme(request: MemeRequest):
             session_id = session.id
         )
 
-        try:
-            os.remove(updated_session.state["meme_file_path"].strip())
-            print("Meme Image has been deleted successfully.")
-        except Exception as e:
-            print("An error occurred: {}".format(e))
-
-        return JSONResponse(
-            status_code = 200,
-            content = {
-                "prompt": updated_session.state["prompt"],
-                "image_url": updated_session.state["image_url"].strip(),
-                "caption": updated_session.state["caption"].strip(),
-                "moderator_response": updated_session.state["moderator_response"],
-                "meme_file_path": updated_session.state["meme_file_path"].strip(),
-                "meme_url": updated_session.state["meme_url"].strip()
-            }
-        )
+        meme_file_path = Path(updated_session.state["meme_file_path"].strip())
+        if not meme_file_path.is_file():
+            return JSONResponse(
+                status_code = 500,
+                content = {
+                    "error": "Internal Server Error: Please try again later."
+                }
+            )
+        
+        img_bytes = meme_file_path.read_bytes()
+        b64_str = base64.b64encode(img_bytes).decode("ascii")
+        payload = {
+            "image": f"data:image/png;base64,{b64_str}",
+            "meme_url": updated_session.state["meme_url"].strip()
+        }
+        background_tasks.add_task(delete_meme_image, updated_session.state["meme_file_path"].strip())
+        return payload
+    
     except Exception as e:
         return JSONResponse(
             status_code = 500,
