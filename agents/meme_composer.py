@@ -23,6 +23,24 @@ def read_image_from_url(url):
     except Exception as e:
         print(f"Failed to fetch image: {e}")
         return None
+    
+def wrap_text(text, font, font_scale, thickness, max_width):
+    words = text.split()
+    if not words:
+        return []
+    
+    lines = []
+    current_line = words[0]
+    for word in words[1:]:
+        test_line = "{} {}".format(current_line, word)
+        (w, _), _ = cv2.getTextSize(test_line, font, font_scale, thickness)
+        if w <= max_width:
+            current_line = test_line
+        else:
+            lines.append(current_line)
+            current_line = word
+    lines.append(current_line)
+    return lines
 
 def generate_meme_image(image_url: str, text: str):
     img = read_image_from_url(image_url)
@@ -46,23 +64,32 @@ def generate_meme_image(image_url: str, text: str):
 
     if white_region is not None:
         x, y, rw, rh = cv2.boundingRect(white_region)
-        (text_w, text_h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 1.0, 2)
-
-        text_x = x + (rw - text_w) // 2
-        text_y = y + (rh + text_h) // 2
-
-        color = (0, 0, 0)
+        region_x, region_y, region_w, region_h = x + 10, y + 10, rw - 20, rh - 20
+        text_color = (0, 0, 0)
     else:
-        (text_w, text_h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 1.0, 2)
-        text_x = (w - text_w) // 2
-        text_y = h - 10
+        region_x, region_y = 10, 10
+        region_w, region_h = w - 20, h - 20
+        region_y = h - 10 - region_h
+        text_color = (255, 255, 255)
 
-        color = (255, 255, 255)
+    lines = wrap_text(text, cv2.FONT_HERSHEY_SIMPLEX, 1.0, 2, region_w)
+    if not lines:
+        return None
+    
+    sizes = [cv2.getTextSize(line, cv2.FONT_HERSHEY_SIMPLEX, 1.0, 2)[0] for line in lines]
+    line_height = sizes[0][1] + 5
+    total_text_height = line_height * len(lines) - 5
+    start_y = region_y + (region_h - total_text_height) // 2 + sizes[0][1]
 
-        cv2.putText(img, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1.0, color, 2, cv2.LINE_AA)
-        output_path = "images/{}.jpg".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
-        cv2.imwrite(output_path, img)
-        return output_path
+    for i, line in enumerate(lines):
+        text_w, text_h = sizes[i]
+        text_x = region_x + (region_w - text_w) // 2
+        text_y = start_y + i * line_height
+        cv2.putText(img, line, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1.0, text_color, 2, cv2.LINE_AA)
+
+    output_path = "images/{}.jpg".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
+    cv2.imwrite(output_path, img)
+    return output_path
 
 MemeComposerAgent = Agent(
     name = "meme_composer",
@@ -74,3 +101,5 @@ MemeComposerAgent = Agent(
         temperature = 0.1
     )
 )
+
+# output_path = "images/{}.jpg".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
