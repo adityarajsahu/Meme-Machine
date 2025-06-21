@@ -2,8 +2,9 @@
 
 # Script to run app.py in background and make it survive terminal close
 sudo apt-get update
-sudo apt-get upgrade -y
-sudo apt install python3-pip
+sudo apt-get -y upgrade
+sudo apt install -y python3-pip
+sudo apt install -y libgl1
 
 pip install -r requirements.txt
 pip install -r UI/requirements.txt

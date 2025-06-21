@@ -34,6 +34,26 @@ class MemeRequest(BaseModel):
 
 session_service = InMemorySessionService()
 
+@app.on_event("startup")
+def build_agents():
+    global ParallelMemeAgent, SequentialMemeAgent
+
+    ParallelMemeAgent = ParallelAgent(
+        name="parallel_meme_agent",
+        sub_agents=[TemplateScoutAgent, CaptionGenerationAgent],
+        description="Parallel agent to scout meme templates and generate caption."
+    )
+
+    SequentialMemeAgent = SequentialAgent(
+        name="sequential_meme_agent",
+        sub_agents=[
+            ParallelMemeAgent,
+            MemeComposerAgent,
+            MemePublisherAgent
+        ],
+        description="Sequential agent to compose and publish the meme."
+    )
+
 @app.get("/")
 async def root():
     return JSONResponse(
@@ -116,25 +136,6 @@ async def generate_meme(request: MemeRequest, background_tasks: BackgroundTasks)
                     "error": "Prompt is not suitable for meme generation."
                 }
             )
-        
-        ParallelMemeAgent = ParallelAgent(
-            name = "parallel_meme_agent",
-            sub_agents = [
-                TemplateScoutAgent,
-                CaptionGenerationAgent
-            ],
-            description = "Parallel agent to scout meme templates and generate caption."
-        )
-
-        SequentialMemeAgent = SequentialAgent(
-            name = "sequential_meme_agent",
-            sub_agents = [
-                ParallelMemeAgent,
-                MemeComposerAgent,
-                MemePublisherAgent
-            ],
-            description = "Sequential agent to compose and publish the meme."
-        )
 
         runner = Runner(
             agent = SequentialMemeAgent, 
@@ -183,67 +184,3 @@ async def generate_meme(request: MemeRequest, background_tasks: BackgroundTasks)
     
 if __name__ == "__main__":
     uvicorn.run("app:app", port = 8080, reload = True)
-
-# ### TEMPLATE SCOUT AGENT ###
-# runner_template_scout = Runner(
-#     agent = TemplateScoutAgent, 
-#     app_name = "meme_machine", 
-#     session_service = session_service
-# )
-
-# content_template_scout = types.Content(role = "user", parts = [types.Part(text = session.state["prompt"])])
-# events_template_scout = runner_template_scout.run(user_id = user_id, session_id = session.id, new_message = content_template_scout) 
-
-# template_response = "No final response captured."
-# for event in events_template_scout:
-#     if event.is_final_response() and event.content and event.content.parts:
-#         # print(f"Potential final response from [{event.author}]: {event.content.parts[0].text}")
-#         template_response = event.content.parts[0].text
-
-# print("Template Scout Final Response: ", template_response)
-
-# ### CAPTION GENERATOR AGENT ###
-# runner_caption_generator = Runner(
-#     agent = CaptionGenerationAgent, 
-#     app_name = "meme_machine", 
-#     session_service = session_service
-# )
-
-# content_caption_generator = types.Content(role = "user", parts = [types.Part(text = session.state["prompt"])])
-# events_caption_generator = runner_caption_generator.run(user_id = user_id, session_id = session.id, new_message = content_caption_generator)
-
-# caption_response = "No final response captured."
-# for event in events_caption_generator:
-#     if event.is_final_response() and event.content and event.content.parts:
-#         # print(f"Potential final response from [{event.author}]: {event.content.parts[0].text}")
-#         caption_response = event.content.parts[0].text
-
-# print("Caption Generator Final Response: ", caption_response)
-
-# ### MEME COMPOSER ###
-# runner_meme_composer = Runner(
-#     agent = MemeComposerAgent,
-#     app_name = "meme_machine", 
-#     session_service = session_service
-# )
-
-# content_meme_composer = types.Content(role = "user", parts = [types.Part(text = session.state["prompt"])])
-# events_meme_composer = runner_meme_composer.run(user_id = user_id, session_id = session.id, new_message = content_meme_composer)
-
-# for event in events_meme_composer:
-#     if event.is_final_response() and event.content and event.content.parts:
-#         print(event.content.parts)
-
-# ### MEME PUBLISHER AGENT ###
-# runner_meme_publisher = Runner(
-#     agent = MemePublisherAgent,
-#     app_name = "meme_machine",
-#     session_service = session_service
-# )
-
-# content_meme_publisher = types.Content(role = "user", parts = [types.Part(text = session.state["prompt"])])
-# events_meme_publisher = runner_meme_publisher.run(user_id = user_id, session_id = session.id, new_message = content_meme_publisher)
-
-# for event in events_meme_publisher:
-#     if event.is_final_response() and event.content and event.content.parts:
-#         print(event.content.parts)

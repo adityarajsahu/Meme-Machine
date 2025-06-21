@@ -1,10 +1,15 @@
 #!/bin/bash
 
-# Script to run app.py in background and make it survive terminal close
+# Script to kill process using port 8080
+rm output_ui.log
 
-PYTHON_SCRIPT="streamlit_ui.py"
+PORT=8501
 
-# Run using nohup so it won't stop if terminal is killed
-nohup streamlit run "$PYTHON_SCRIPT" > output_ui.log 2>&1 &
+PID=$(lsof -t -i:$PORT)
 
-echo "Started $PYTHON_SCRIPT in background. Logs: output.log"
+if [ -z "$PID" ]; then
+  echo "No process found using port $PORT"
+else
+  echo "Killing process $PID using port $PORT"
+  kill -9 $PID
+fi

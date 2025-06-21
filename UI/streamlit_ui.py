@@ -39,8 +39,8 @@ def main():
         else:
             with st.spinner("Generating your meme...", show_time = True):
                 response = generate_meme(input_prompt)
+                response_data = response.json()
                 if response.status_code == 200:
-                    response_data = response.json()
                     st.link_button("Go to  Meme", response_data["meme_url"], use_container_width = True)
                     st.write("Here is the generated meme! In case the posted meme was taken down by the subreddit moderators, you can still view it here.")
                     st.image(response_data["image"])
