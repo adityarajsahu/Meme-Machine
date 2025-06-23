@@ -63,3 +63,20 @@ To stop any of the service, use it's corresponding stop shell script,
 cd UI/
 ./stop_ui_service.sh
 ```
+
+### Environment Variables
+The FastAPI service requires a set of environment variables, which are saved in `agents/` sub-directory inside `.env` file
+
+```
+GOOGLE_API_KEY = "..."
+GOOGLE_GENAI_USE_VERTEXAI = FALSE
+CLIENT_ID = "..."
+CLIENT_SECRET = "..."
+REDDIT_USER_AGENT = "..."
+REDDIT_USERNAME = "..."
+REDDIT_PASSWORD = "..."
+```
+
+- Google API key is actually Gemini API key from [Google AI for Developer](https://ai.google.dev/gemini-api/docs/api-key).
+- Get the Client ID, Client Secret and Reddit User Agent from [Reddit Preferences](https://www.reddit.com/prefs/apps).
+- Reddit Username and Password is your regular Reddit login credentials.
